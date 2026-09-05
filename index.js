@@ -36,13 +36,17 @@ app.post('/deploy', async (req, res) => {
 // 2. EXECUTE ENDPOINT: Hits the URL and runs code in Docker sandbox
 app.get('/run/:id', async (req, res) => {
     const { id } = req.params;
-    const filePath = path.join(FUNCTIONS_DIR, `${id}.js`);
+    const containerFilePath = path.join(FUNCTIONS_DIR, `${id}.js`);
+
+    // Map container path to host path for Docker-out-of-Docker volume mounting
+    const hostDir = process.env.HOST_PROJECT_PATH || __dirname;
+    const hostFilePath = path.join(hostDir, 'functions', `${id}.js`);
 
     try {
-        await fs.access(filePath);
+        await fs.access(containerFilePath);
 
-        // Docker Sandbox (isolation, no internet, memory/cpu limits)
-        const dockerCmd = `docker run --rm --network none --memory="64m" --cpus="0.5" -v ${filePath}:/app/index.js node:18-alpine node /app/index.js`;
+        // Docker Sandbox using the host file path
+        const dockerCmd = `docker run --rm --network none --memory="64m" --cpus="0.5" -v ${hostFilePath}:/app/index.js node:18-alpine node /app/index.js`;
 
         const { stdout, stderr } = await execPromise(dockerCmd, { timeout: 5000 });
 
